@@ -94,14 +94,16 @@ import java.util.Locale;
 
 public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
     private static final String TAG = "FitHomeFragment";
-    private static final String ENERGY_DATE_KEY = "fit_home_energy_date";
-    private static final String ENERGY_START_TOTAL_KEY = "fit_home_energy_start_total";
-    private static final String ENERGY_TODAY_USAGE_KEY = "fit_home_energy_today_usage";
-    private static final String ENERGY_LAST_TOTAL_KEY = "fit_home_energy_last_total";
-    private static final String ENERGY_YESTERDAY_DATE_KEY = "fit_home_energy_yesterday_date";
-    private static final String ENERGY_YESTERDAY_USAGE_KEY = "fit_home_energy_yesterday_usage";
-    private static final String ENERGY_TODAY_HOURLY_USAGE_KEY = "fit_home_energy_today_hourly_usage";
-    private static final String ENERGY_YESTERDAY_HOURLY_USAGE_KEY = "fit_home_energy_yesterday_hourly_usage";
+    private static final String ENERGY_DATE_KEY = "energy_date";
+    private static final String ENERGY_START_TOTAL_KEY = "energy_start_total";
+    private static final String ENERGY_TODAY_USAGE_KEY = "energy_today_usage";
+    private static final String ENERGY_LAST_TOTAL_KEY = "energy_last_total";
+    private static final String ENERGY_YESTERDAY_DATE_KEY = "energy_yesterday_date";
+    private static final String ENERGY_YESTERDAY_USAGE_KEY = "energy_yesterday_usage";
+    private static final String ENERGY_TODAY_HOURLY_USAGE_KEY = "energy_today_hourly_usage";
+    private static final String ENERGY_YESTERDAY_HOURLY_USAGE_KEY = "energy_yesterday_hourly_usage";
+    private static final String ENERGY_OLD_KEY_PREFIX = "fit_home_";
+    private static final BigDecimal ENERGY_MAX_SINGLE_DELTA = new BigDecimal("20.0");
 
     private View rootView;
     private View panel;
@@ -687,35 +689,55 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
 
     private void updateTodayEnergy(BigDecimal totalElectricity) {
         String today = dateFormat.format(new Date());
-        String savedDate = String.valueOf(MySpUtil.getParam(requireContext(), ENERGY_DATE_KEY, ""));
+        String savedDate = getEnergyString(ENERGY_DATE_KEY);
         BigDecimal todayUsage = getEnergyDecimal(ENERGY_TODAY_USAGE_KEY, BigDecimal.ZERO);
         BigDecimal startTotal = getEnergyDecimal(ENERGY_START_TOTAL_KEY, null);
+        BigDecimal lastTotal = getEnergyDecimal(ENERGY_LAST_TOTAL_KEY, null);
 
         if (StringUtils.isNullOrEmpty(savedDate)) {
             savedDate = today;
             todayUsage = BigDecimal.ZERO;
             startTotal = totalElectricity;
-            saveEnergyDayState(savedDate, todayUsage, startTotal);
+            lastTotal = totalElectricity;
+            saveEnergyDayState(savedDate, todayUsage, startTotal, lastTotal);
         } else if (!today.equals(savedDate)) {
             BigDecimal yesterdayUsage = todayUsage == null ? BigDecimal.ZERO : todayUsage;
             MySpUtil.setParam(requireContext(), ENERGY_YESTERDAY_DATE_KEY, savedDate);
             MySpUtil.setParam(requireContext(), ENERGY_YESTERDAY_USAGE_KEY, energyToString(yesterdayUsage));
             MySpUtil.setParam(requireContext(), ENERGY_YESTERDAY_HOURLY_USAGE_KEY,
-                    String.valueOf(MySpUtil.getParam(requireContext(), ENERGY_TODAY_HOURLY_USAGE_KEY, "")));
+                    getEnergyString(ENERGY_TODAY_HOURLY_USAGE_KEY));
             MySpUtil.setParam(requireContext(), ENERGY_TODAY_HOURLY_USAGE_KEY, "");
             savedDate = today;
             todayUsage = BigDecimal.ZERO;
             startTotal = totalElectricity;
-            saveEnergyDayState(savedDate, todayUsage, startTotal);
+            lastTotal = totalElectricity;
+            saveEnergyDayState(savedDate, todayUsage, startTotal, lastTotal);
         } else {
-            if (startTotal == null || startTotal.compareTo(BigDecimal.ZERO) <= 0
-                    || totalElectricity.compareTo(startTotal) < 0) {
-                startTotal = totalElectricity;
+            if (todayUsage == null) {
                 todayUsage = BigDecimal.ZERO;
-            } else {
-                todayUsage = totalElectricity.subtract(startTotal);
             }
-            saveEnergyDayState(savedDate, todayUsage, startTotal);
+            if (lastTotal == null) {
+                if (startTotal != null && startTotal.compareTo(BigDecimal.ZERO) > 0
+                        && totalElectricity.compareTo(startTotal) >= 0) {
+                    BigDecimal migratedUsage = totalElectricity.subtract(startTotal);
+                    if (migratedUsage.compareTo(todayUsage) > 0) {
+                        todayUsage = migratedUsage;
+                    }
+                } else {
+                    startTotal = totalElectricity;
+                }
+            } else if (totalElectricity.compareTo(lastTotal) >= 0) {
+                BigDecimal delta = totalElectricity.subtract(lastTotal);
+                if (delta.compareTo(ENERGY_MAX_SINGLE_DELTA) <= 0) {
+                    todayUsage = todayUsage.add(delta);
+                } else {
+                    startTotal = totalElectricity;
+                }
+            } else {
+                startTotal = totalElectricity;
+            }
+            lastTotal = totalElectricity;
+            saveEnergyDayState(savedDate, todayUsage, startTotal, lastTotal);
         }
 
         updateTodayHourlyUsage(todayUsage);
@@ -724,10 +746,11 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         renderEnergyCompare(todayUsage);
     }
 
-    private void saveEnergyDayState(String date, BigDecimal todayUsage, BigDecimal startTotal) {
+    private void saveEnergyDayState(String date, BigDecimal todayUsage, BigDecimal startTotal, BigDecimal lastTotal) {
         MySpUtil.setParam(requireContext(), ENERGY_DATE_KEY, date);
         MySpUtil.setParam(requireContext(), ENERGY_TODAY_USAGE_KEY, energyToString(todayUsage));
         MySpUtil.setParam(requireContext(), ENERGY_START_TOTAL_KEY, energyToString(startTotal));
+        MySpUtil.setParam(requireContext(), ENERGY_LAST_TOTAL_KEY, energyToString(lastTotal));
     }
 
     private void renderEnergyCompare(BigDecimal todayUsage) {
@@ -761,7 +784,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
 
     private BigDecimal getYesterdaySameHourUsage() {
         BigDecimal[] yesterdayHourly = parseHourlyUsage(String.valueOf(
-                MySpUtil.getParam(requireContext(), ENERGY_YESTERDAY_HOURLY_USAGE_KEY, "")));
+                getEnergyString(ENERGY_YESTERDAY_HOURLY_USAGE_KEY)));
         int hour = currentHour();
         if (hour >= 0 && hour < yesterdayHourly.length && yesterdayHourly[hour].compareTo(BigDecimal.ZERO) > 0) {
             return yesterdayHourly[hour];
@@ -771,7 +794,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
 
     private void updateTodayHourlyUsage(BigDecimal todayUsage) {
         BigDecimal[] hourly = parseHourlyUsage(String.valueOf(
-                MySpUtil.getParam(requireContext(), ENERGY_TODAY_HOURLY_USAGE_KEY, "")));
+                getEnergyString(ENERGY_TODAY_HOURLY_USAGE_KEY)));
         int hour = currentHour();
         if (hour >= 0 && hour < hourly.length && todayUsage.compareTo(hourly[hour]) > 0) {
             hourly[hour] = todayUsage;
@@ -815,7 +838,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
 
     private BigDecimal getEnergyDecimal(String key, BigDecimal defaultValue) {
         try {
-            return parseEnergyDecimal(String.valueOf(MySpUtil.getParam(requireContext(), key, "")), defaultValue);
+            return parseEnergyDecimal(getEnergyString(key), defaultValue);
         } catch (ClassCastException e) {
             try {
                 float oldValue = (float) MySpUtil.getParam(requireContext(), key, 0f);
@@ -826,6 +849,14 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         } catch (Exception e) {
             return defaultValue;
         }
+    }
+
+    private String getEnergyString(String key) {
+        String value = String.valueOf(MySpUtil.getParam(requireContext(), key, ""));
+        if (!StringUtils.isNullOrEmpty(value)) {
+            return value;
+        }
+        return String.valueOf(MySpUtil.getParam(requireContext(), ENERGY_OLD_KEY_PREFIX + key, ""));
     }
 
     private BigDecimal parseEnergyDecimal(String value, BigDecimal defaultValue) {
