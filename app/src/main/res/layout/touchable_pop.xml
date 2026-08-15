@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E2CEB8">
+
+    <LinearLayout
+        android:id="@+id/main_menu_page"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/tv_caring_mode"
+            android:layout_width="130dp"
+            android:layout_height="150dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="82dp"
+                android:layout_height="82dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/icon_admin" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="17dp"
+                android:gravity="center"
+                android:text="&#x8F85;&#x52A9;&#x529F;&#x80FD;"
+                android:textColor="#303030"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <Space
+            android:layout_width="96dp"
+            android:layout_height="1dp" />
+
+        <LinearLayout
+            android:id="@+id/tv_wifi"
+            android:layout_width="130dp"
+            android:layout_height="150dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="82dp"
+                android:layout_height="82dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/icon_wifi" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="17dp"
+                android:gravity="center"
+                android:text="&#x914D;&#x7F51;&#x529F;&#x80FD;"
+                android:textColor="#303030"
+                android:textSize="18sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/assist_page"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/assist_back"
+            android:layout_width="@dimen/li_return_image"
+            android:layout_height="@dimen/li_return_image"
+            android:layout_marginLeft="@dimen/hy_lay_dp_32"
+            android:layout_marginTop="@dimen/hy_lay_dp_16"
+            android:gravity="center"
+            android:padding="@dimen/hy_lay_dp_15"
+            android:src="@drawable/icon_return"
+            android:tint="#000" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="25dp"
+            android:gravity="center"
+            android:text="&#x8F85;&#x52A9;&#x529F;&#x80FD;"
+            android:textColor="#333333"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="416dp"
+            android:layout_gravity="center"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="286dp"
+                android:layout_height="376dp"
+                android:background="@drawable/touch_pop_card_bg"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingTop="25dp">
+
+                <ImageView
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/icon_brightness" />
+
+                <TextView
+                    android:id="@+id/tv_brightness_percent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:gravity="center"
+                    android:text="80%"
+                    android:textColor="#2F2F2F"
+                    android:textSize="25sp"
+                    android:textStyle="bold" />
+
+                <FrameLayout
+                    android:layout_width="120dp"
+                    android:layout_height="214dp"
+                    android:layout_marginTop="9dp">
+
+                    <com.hy.greenbuilding.ui.widget.VerticalBrightnessSlider
+                        android:id="@+id/seekBar"
+                        android:layout_width="90dp"
+                        android:layout_height="214dp"
+                        android:layout_gravity="center" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="18dp"
+                    android:layout_marginRight="18dp"
+                    android:gravity="center"
+                    android:text="&#x6309;&#x4F4F;&#x6ED1;&#x5757;&#x4E0A;&#x4E0B;&#x6ED1;&#x52A8;&#x8C03;&#x8282;&#x4EAE;&#x5EA6;"
+                    android:textColor="#8D8D8D"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <Space
+                android:layout_width="38dp"
+                android:layout_height="1dp" />
+
+            <LinearLayout
+                android:layout_width="456dp"
+                android:layout_height="376dp"
+                android:background="@drawable/touch_pop_card_bg"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingLeft="26dp"
+                android:paddingTop="28dp"
+                android:paddingRight="26dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="&#x606F;&#x5C4F;&#x8BBE;&#x7F6E;"
+                    android:textColor="#333333"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <GridLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="31dp"
+                    android:alignmentMode="alignMargins"
+                    android:columnCount="3"
+                    android:rowCount="2"
+                    android:useDefaultMargins="false">
+
+                    <TextView
+                        android:id="@+id/timeout_30s"
+                        style="@style/TouchPopTimeoutButton"
+                        android:text="30&#x79D2;" />
+
+                    <TextView
+                        android:id="@+id/timeout_1m"
+                        style="@style/TouchPopTimeoutButton"
+                        android:text="1&#x5206;&#x949F;" />
+
+                    <TextView
+                        android:id="@+id/timeout_2m"
+                        style="@style/TouchPopTimeoutButton"
+                        android:text="2&#x5206;&#x949F;" />
+
+                    <TextView
+                        android:id="@+id/timeout_5m"
+                        style="@style/TouchPopTimeoutButton"
+                        android:text="5&#x5206;&#x949F;" />
+
+                    <TextView
+                        android:id="@+id/timeout_10m"
+                        style="@style/TouchPopTimeoutButton"
+                        android:text="10&#x5206;&#x949F;" />
+
+                    <TextView
+                        android:id="@+id/timeout_never"
+                        style="@style/TouchPopTimeoutButton"
+                        android:text="&#x6C38;&#x4E0D;" />
+                </GridLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/tv_classic_mode"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/tv_dark_mode"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/tv_admin"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_app_version"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_control_version"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_version_update"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/ll_pop"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:layout_gravity="bottom"
+        android:gravity="center">
+
+        <View
+            android:layout_width="166dp"
+            android:layout_height="5dp"
+            android:background="#B48C6E" />
+    </LinearLayout>
+</FrameLayout>
