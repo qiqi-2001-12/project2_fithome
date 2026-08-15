@@ -30,6 +30,7 @@ import com.hy.greenbuilding.event.DefrostChangeEvent;
 import com.hy.greenbuilding.event.TempStatusUpdateEvent;
 import com.hy.greenbuilding.model.UpTempItem;
 import com.hy.greenbuilding.protocol.FunctionObject;
+import com.hy.greenbuilding.protocol.ResPonseInfo.MainControlInfo;
 import com.hy.greenbuilding.protocol.ResPonseInfo.UpTempStatusInfo;
 import com.hy.greenbuilding.protocol.SpDataProcessor;
 import com.hy.greenbuilding.protocol.command.ControlCommand;
@@ -271,6 +272,17 @@ public class UpTempFragment extends BaseDialogFragment {
             }
             upTempAdapter.notifyDataSetChanged();
         }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMainControlEvent(MainControlInfo info) {
+        if (info == null) {
+            return;
+        }
+        int tempMode = info.tempControlMode();
+        EventBus.getDefault().post(new TempStatusUpdateEvent(tempMode != 0, tempMode));
+        EventBus.getDefault().post(new DefrostChangeEvent(info.getDefrostStatus() == 1));
+        sendStatusCommand();
     }
 
 
