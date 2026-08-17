@@ -21,6 +21,7 @@ android {
         versionCode 116
         versionName "16.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        resConfigs "zh"
         externalNativeBuild {
 //            cmake {
 //                cppFlags ""
@@ -32,7 +33,7 @@ android {
         }
         ndk {
             // moduleName "serial_port"
-            abiFilters "armeabi-v7a", "x86"
+            abiFilters "armeabi-v7a"
             ldLibs "log"
         }
     }
