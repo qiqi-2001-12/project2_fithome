@@ -669,6 +669,7 @@ public class MyMqttService extends Service {
         SaveFilterScreen saveFilterScreen = MySpUtil.getFilterScreen(mContext);
         Log.e("TAG", "sendDataToServer: "+new Gson().toJson(saveFilterScreen));
         if (saveFilterScreen != null) {
+            hdTopic.setScreenStatus((byte) calculateFilterUsedRate(saveFilterScreen));
             ByteBuffer byteBuffer = ByteBuffer.allocate(24);
             byteBuffer.put(ByteUtils.changeBytes(ByteUtils.stringToByteArray(saveFilterScreen.getFreshAirChange())));
             byteBuffer.put(ByteUtils.changeBytes(ByteUtils.stringToByteArray(saveFilterScreen.getExhaustChange())));
@@ -701,6 +702,44 @@ public class MyMqttService extends Service {
             Log.e("TAG", "sendDataToServer1122: "+ByteUtils.byteArrayToHexString(byteBuffer.array(),0,byteBuffer.array().length));
 
             hxTopic.setScreenFilterSet(byteBuffer.array());
+        }
+    }
+
+    private static int calculateFilterUsedRate(SaveFilterScreen saveFilterScreen) {
+        int usedRate = calculateFilterUsedRate(saveFilterScreen.getFreshAirUse(), saveFilterScreen.getFreshAirChange());
+        if (usedRate > 0) {
+            return usedRate;
+        }
+        usedRate = calculateFilterUsedRate(saveFilterScreen.getExhaustUse(), saveFilterScreen.getExhaustChange());
+        if (usedRate > 0) {
+            return usedRate;
+        }
+        usedRate = calculateFilterUsedRate(saveFilterScreen.getCircle1Use(), saveFilterScreen.getCircle1Change());
+        if (usedRate > 0) {
+            return usedRate;
+        }
+        return calculateFilterUsedRate(saveFilterScreen.getCircle2Use(), saveFilterScreen.getCircle2Change());
+    }
+
+    private static int calculateFilterUsedRate(String useSeconds, String changeHours) {
+        long use = parseLong(useSeconds);
+        long change = parseLong(changeHours);
+        if (use <= 0 || change <= 0) {
+            return 0;
+        }
+        long changeSeconds = change * 3600L;
+        int usedRate = (int) Math.round((double) use * 100 / changeSeconds);
+        return Math.max(0, Math.min(100, usedRate));
+    }
+
+    private static long parseLong(String value) {
+        if (StringUtils.isNullOrEmpty(value)) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (Exception e) {
+            return 0L;
         }
     }
 }

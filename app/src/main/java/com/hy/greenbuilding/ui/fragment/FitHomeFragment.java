@@ -18,6 +18,7 @@ import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -82,6 +83,8 @@ import org.greenrobot.eventbus.ThreadMode;
 
 import java.text.SimpleDateFormat;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -91,6 +94,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Properties;
 
 public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
     private static final String TAG = "FitHomeFragment";
@@ -103,6 +107,8 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
     private static final String ENERGY_TODAY_HOURLY_USAGE_KEY = "energy_today_hourly_usage";
     private static final String ENERGY_YESTERDAY_HOURLY_USAGE_KEY = "energy_yesterday_hourly_usage";
     private static final String ENERGY_OLD_KEY_PREFIX = "fit_home_";
+    private static final String ENERGY_BACKUP_DIR_NAME = "green_building";
+    private static final String ENERGY_BACKUP_FILE_NAME = "energy_state.properties";
     private static final BigDecimal ENERGY_MAX_SINGLE_DELTA = new BigDecimal("20.0");
 
     private View rootView;
@@ -224,6 +230,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
     private ProgressDialog progressDialog;
     private int latestFreshAirLevel;
     private int latestPurifyLevel;
+    private int latestBoardFilterUsedRate = -1;
     private long windUseTime = 0;
     private long exhaustTime = 0;
     private long circle1UseTime = 0;
@@ -573,6 +580,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         co2View.setText(String.valueOf(state.getCo2()));
         latestFreshAirLevel = state.getFreshAirLevel();
         latestPurifyLevel = state.getPurifyLevel();
+        latestBoardFilterUsedRate = state.getFilterRemainingRate();
         renderFilterRemainingRate();
         updateFanSelection(fanButtonForLevel(Math.max(state.getFreshAirLevel(), state.getPurifyLevel())));
         if (careTempView != null) {
@@ -589,9 +597,16 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         if (filterValueView == null || filterProgressBar == null || getActivity() == null) {
             return;
         }
-        int remainingRate = getOriginalFilterRemainingRate();
+        int remainingRate = getPreferredFilterRemainingRate();
         filterValueView.setText(remainingRate + "%");
         filterProgressBar.setProgress(clamp(remainingRate, 0, 100));
+    }
+
+    private int getPreferredFilterRemainingRate() {
+        if (latestBoardFilterUsedRate > 0 && latestBoardFilterUsedRate <= 100) {
+            return 100 - latestBoardFilterUsedRate;
+        }
+        return getOriginalFilterRemainingRate();
     }
 
     private int getOriginalFilterRemainingRate() {
@@ -693,12 +708,30 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         BigDecimal todayUsage = getEnergyDecimal(ENERGY_TODAY_USAGE_KEY, BigDecimal.ZERO);
         BigDecimal startTotal = getEnergyDecimal(ENERGY_START_TOTAL_KEY, null);
         BigDecimal lastTotal = getEnergyDecimal(ENERGY_LAST_TOTAL_KEY, null);
+        EnergyDayState backupState = getUsableEnergyBackup(today, totalElectricity);
 
         if (StringUtils.isNullOrEmpty(savedDate)) {
-            savedDate = today;
-            todayUsage = BigDecimal.ZERO;
-            startTotal = totalElectricity;
-            lastTotal = totalElectricity;
+            if (backupState != null) {
+                savedDate = backupState.date;
+                todayUsage = backupState.todayUsage;
+                startTotal = backupState.startTotal;
+                lastTotal = backupState.lastTotal;
+                restoreEnergyHourlyUsage(backupState);
+                if (totalElectricity.compareTo(lastTotal) > 0) {
+                    BigDecimal delta = totalElectricity.subtract(lastTotal);
+                    if (delta.compareTo(ENERGY_MAX_SINGLE_DELTA) <= 0) {
+                        todayUsage = todayUsage.add(delta);
+                    } else {
+                        startTotal = totalElectricity;
+                    }
+                    lastTotal = totalElectricity;
+                }
+            } else {
+                savedDate = today;
+                todayUsage = BigDecimal.ZERO;
+                startTotal = totalElectricity;
+                lastTotal = totalElectricity;
+            }
             saveEnergyDayState(savedDate, todayUsage, startTotal, lastTotal);
         } else if (!today.equals(savedDate)) {
             BigDecimal yesterdayUsage = todayUsage == null ? BigDecimal.ZERO : todayUsage;
@@ -713,6 +746,12 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
             lastTotal = totalElectricity;
             saveEnergyDayState(savedDate, todayUsage, startTotal, lastTotal);
         } else {
+            if (shouldRestoreEnergyBackup(backupState, todayUsage, lastTotal)) {
+                todayUsage = backupState.todayUsage;
+                startTotal = backupState.startTotal;
+                lastTotal = backupState.lastTotal;
+                restoreEnergyHourlyUsage(backupState);
+            }
             if (todayUsage == null) {
                 todayUsage = BigDecimal.ZERO;
             }
@@ -741,6 +780,8 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         }
 
         updateTodayHourlyUsage(todayUsage);
+        backupEnergyDayState(savedDate, todayUsage, startTotal, lastTotal,
+                getEnergyString(ENERGY_TODAY_HOURLY_USAGE_KEY));
         todayUsage = todayUsage.setScale(1, BigDecimal.ROUND_DOWN);
         energyValueView.setText(todayUsage.toPlainString() + "度");
         renderEnergyCompare(todayUsage);
@@ -751,6 +792,120 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         MySpUtil.setParam(requireContext(), ENERGY_TODAY_USAGE_KEY, energyToString(todayUsage));
         MySpUtil.setParam(requireContext(), ENERGY_START_TOTAL_KEY, energyToString(startTotal));
         MySpUtil.setParam(requireContext(), ENERGY_LAST_TOTAL_KEY, energyToString(lastTotal));
+    }
+
+    private EnergyDayState getUsableEnergyBackup(String today, BigDecimal totalElectricity) {
+        EnergyDayState backupState = readEnergyBackupState();
+        if (backupState == null || StringUtils.isNullOrEmpty(backupState.date)
+                || !today.equals(backupState.date)
+                || backupState.todayUsage == null
+                || backupState.startTotal == null
+                || backupState.lastTotal == null
+                || backupState.todayUsage.compareTo(BigDecimal.ZERO) < 0
+                || backupState.startTotal.compareTo(BigDecimal.ZERO) <= 0
+                || backupState.lastTotal.compareTo(BigDecimal.ZERO) <= 0
+                || totalElectricity.compareTo(backupState.startTotal) < 0
+                || totalElectricity.compareTo(backupState.lastTotal) < 0) {
+            return null;
+        }
+        return backupState;
+    }
+
+    private boolean shouldRestoreEnergyBackup(EnergyDayState backupState, BigDecimal todayUsage, BigDecimal lastTotal) {
+        if (backupState == null) {
+            return false;
+        }
+        if (todayUsage == null || lastTotal == null) {
+            return true;
+        }
+        return backupState.todayUsage.compareTo(todayUsage) > 0
+                || backupState.lastTotal.compareTo(lastTotal) > 0;
+    }
+
+    private void restoreEnergyHourlyUsage(EnergyDayState backupState) {
+        if (backupState != null && !StringUtils.isNullOrEmpty(backupState.todayHourlyUsage)) {
+            MySpUtil.setParam(requireContext(), ENERGY_TODAY_HOURLY_USAGE_KEY, backupState.todayHourlyUsage);
+        }
+    }
+
+    private EnergyDayState readEnergyBackupState() {
+        File file = getEnergyBackupFile();
+        if (!file.exists()) {
+            return null;
+        }
+        FileInputStream inputStream = null;
+        try {
+            Properties properties = new Properties();
+            inputStream = new FileInputStream(file);
+            properties.load(inputStream);
+            EnergyDayState state = new EnergyDayState();
+            state.date = properties.getProperty(ENERGY_DATE_KEY, "");
+            state.todayUsage = parseEnergyDecimal(properties.getProperty(ENERGY_TODAY_USAGE_KEY), null);
+            state.startTotal = parseEnergyDecimal(properties.getProperty(ENERGY_START_TOTAL_KEY), null);
+            state.lastTotal = parseEnergyDecimal(properties.getProperty(ENERGY_LAST_TOTAL_KEY), null);
+            state.todayHourlyUsage = properties.getProperty(ENERGY_TODAY_HOURLY_USAGE_KEY, "");
+            return state;
+        } catch (Exception e) {
+            Log.e(TAG, "readEnergyBackupState: " + e.getMessage());
+            return null;
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private void backupEnergyDayState(String date, BigDecimal todayUsage, BigDecimal startTotal,
+                                      BigDecimal lastTotal, String todayHourlyUsage) {
+        File file = getEnergyBackupFile();
+        File parentFile = file.getParentFile();
+        if (parentFile != null && !parentFile.exists() && !parentFile.mkdirs()) {
+            return;
+        }
+        if (parentFile != null) {
+            parentFile.setReadable(true, false);
+            parentFile.setWritable(true, false);
+            parentFile.setExecutable(true, false);
+        }
+        FileOutputStream outputStream = null;
+        try {
+            Properties properties = new Properties();
+            properties.setProperty(ENERGY_DATE_KEY, StringUtils.isNullOrEmpty(date) ? "" : date);
+            properties.setProperty(ENERGY_TODAY_USAGE_KEY, energyToString(todayUsage));
+            properties.setProperty(ENERGY_START_TOTAL_KEY, energyToString(startTotal));
+            properties.setProperty(ENERGY_LAST_TOTAL_KEY, energyToString(lastTotal));
+            properties.setProperty(ENERGY_TODAY_HOURLY_USAGE_KEY,
+                    StringUtils.isNullOrEmpty(todayHourlyUsage) ? "" : todayHourlyUsage);
+            outputStream = new FileOutputStream(file);
+            properties.store(outputStream, "green building energy state");
+            file.setReadable(true, false);
+            file.setWritable(true, false);
+        } catch (Exception e) {
+            Log.e(TAG, "backupEnergyDayState: " + e.getMessage());
+        } finally {
+            if (outputStream != null) {
+                try {
+                    outputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private File getEnergyBackupFile() {
+        return new File(new File(Environment.getExternalStorageDirectory(), ENERGY_BACKUP_DIR_NAME),
+                ENERGY_BACKUP_FILE_NAME);
+    }
+
+    private static class EnergyDayState {
+        String date;
+        BigDecimal todayUsage;
+        BigDecimal startTotal;
+        BigDecimal lastTotal;
+        String todayHourlyUsage;
     }
 
     private void renderEnergyCompare(BigDecimal todayUsage) {
@@ -1378,14 +1533,19 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
 
     private void applyCloudManualMode(int value) {
         int mode = clamp(value, 0, 3);
+        if (mode == 0) {
+            writeControlMode(false, false, 0);
+            MqttUploadManager.getInstance().getmHDTopic().setRunMode((byte) 0);
+            MqttUploadManager.getInstance().getmHxTopic().setAdditionalManualMode((byte) 0);
+            return;
+        }
         if (mode == 3) {
             writeHumiditySwitch(true);
         }
         writeControlMode(false, true, mode);
-        if (mode > 0) {
-            writeFanPair((byte) 0x02, 2);
-            writeTempControlSwitch(true);
-        }
+        writeFanPair((byte) 0x02, 2);
+        writeTempControlSwitch(true);
+        MqttUploadManager.getInstance().getmHDTopic().setRunMode((byte) 1);
         MqttUploadManager.getInstance().getmHxTopic().setAdditionalManualMode((byte) mode);
     }
 

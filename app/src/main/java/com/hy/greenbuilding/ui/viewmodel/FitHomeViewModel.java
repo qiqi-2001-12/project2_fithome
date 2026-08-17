@@ -319,12 +319,12 @@ public class FitHomeViewModel extends AndroidViewModel {
         int tempMode = info.tempControlMode();
         hdTopic.setAirSwitch((byte) (tempMode == 0 ? 0x00 : 0x01));
         hdTopic.setAirMode((byte) airModeForUpload(tempMode));
-        hdTopic.setRunMode((byte) (info.runMode() == 0 ? 0x01 : 0x00));
+        hdTopic.setRunMode((byte) clamp(info.runMode(), 0, 1));
         hdTopic.setSetHumidity((byte) info.getHumidity().intValue());
         hdTopic.setTempMin((byte) info.setTempMin().intValue());
         hdTopic.setTempMax((byte) info.setTempMax().intValue());
         hxTopic.setHumidity1((byte) info.getHumidity1().intValue());
-        hxTopic.setAdditionalManualMode((byte) (info.newControlField() & 0xFF));
+        hxTopic.setAdditionalManualMode((byte) (info.runMode() == 0 ? 0 : (info.newControlField() & 0xFF)));
         int outTermType = info.getOutTermType();
         if (outTermType == 1) {
             hxTopic.setOutTermChoice((byte) 0x01);
