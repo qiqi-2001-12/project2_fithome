@@ -1,2 +1,2 @@
 include ':app', ':gateway'
-rootProject.name='green_building'
+rootProject.name='fithome'
