@@ -214,6 +214,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
     private boolean winterThemeSelected = true;
     private boolean isOtaOpen;
     private boolean isUpdating;
+    private boolean startupStateRestored;
     private static final int MAX_OTA_RETRY = 3;//主板OTA失败重试上限，达到后跳过主板升级直接安装App
     private static final long BOARD_OTA_TIMEOUT_MS = 5 * 60 * 1000;//主板OTA看门狗：超时后放弃并安装App
     private int otaFailCount = 0;//主板OTA连续失败次数
@@ -324,6 +325,7 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         handler.post(energyTicker);
         if (viewModel != null) {
             viewModel.startPolling();
+            restoreStartupComfortScene();
         }
     }
 
@@ -371,6 +373,19 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         selectFan(fanLowButton);
         selectScene(selectedScene);
         applyLayoutMode();
+    }
+
+    private void restoreStartupComfortScene() {
+        if (startupStateRestored || isOtaBlocked()) {
+            return;
+        }
+        startupStateRestored = true;
+        selectedScene = "comfort";
+        targetTemp = getSceneTemp(selectedScene);
+        targetHumidity = getSceneHumidity(selectedScene);
+        updateTargetViews();
+        selectScene(selectedScene);
+        viewModel.restoreLegacyStartupState(targetTemp, targetHumidity, winterThemeSelected);
     }
 
     private void bindViews(View root) {
@@ -1410,11 +1425,11 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         sceneEcoButton.setOnClickListener(v -> applyScene("eco"));
         sceneComfortButton.setOnClickListener(v -> applyScene("comfort"));
         sceneVacationButton.setOnClickListener(v -> applyScene("vacation"));
-        sceneCustomButton.setOnClickListener(v -> selectScene("custom"));
+        sceneCustomButton.setOnClickListener(v -> applyCustomScene());
         careSceneEcoButton.setOnClickListener(v -> applyScene("eco"));
         careSceneComfortButton.setOnClickListener(v -> applyScene("comfort"));
         careSceneVacationButton.setOnClickListener(v -> applyScene("vacation"));
-        careSceneCustomButton.setOnClickListener(v -> selectScene("custom"));
+        careSceneCustomButton.setOnClickListener(v -> applyCustomScene());
         classicModeButton.setOnClickListener(v -> selectMode(true));
         careModeButton.setOnClickListener(v -> selectMode(false));
         root.findViewById(R.id.hit_fit_home_classic_mode).setOnClickListener(v -> selectMode(true));
@@ -1510,6 +1525,14 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
         updateTargetViews();
         selectScene(scene);
         sendSceneTarget();
+    }
+
+    private void applyCustomScene() {
+        if (isOtaBlocked()) {
+            return;
+        }
+        selectScene("custom");
+        switchToManualMode();
     }
 
     private void updateTargetViews() {
@@ -1841,6 +1864,12 @@ public class FitHomeFragment extends Fragment implements IGetMessageCallBack {
     private void sendFanLevel(int level) {
         if (viewModel != null && !isOtaBlocked()) {
             viewModel.writeFanLevel(level);
+        }
+    }
+
+    private void switchToManualMode() {
+        if (viewModel != null && !isOtaBlocked()) {
+            viewModel.writeManualControlMode();
         }
     }
 

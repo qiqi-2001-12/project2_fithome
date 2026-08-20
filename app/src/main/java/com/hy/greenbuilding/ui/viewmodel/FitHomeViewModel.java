@@ -171,8 +171,25 @@ public class FitHomeViewModel extends AndroidViewModel {
     }
 
     public void writeFanLevel(int level) {
+        int fanLevel = clamp(level, 0, 3);
+        writeManualControlMode();
+        writeFanLevel((byte) 0x00, fanLevel);
+        writeFanLevel((byte) 0x01, fanLevel);
+        writeFanLevel((byte) 0x02, fanLevel);
+        writeFanLevel((byte) 0x03, fanLevel);
+
+        HDTopic hdTopic = MqttUploadManager.getInstance().getmHDTopic();
+        hdTopic.setWindStatus((byte) fanLevel);
+        hdTopic.setCircleStatus((byte) fanLevel);
+    }
+
+    public void writeManualControlMode() {
+        writeManualMode(latestManualMode);
+    }
+
+    private void writeFanLevel(byte type, int level) {
         FanCommand command = new FanCommand(FunctionObject.SET_SPEED);
-        command.setData(new byte[]{0x00, (byte) clamp(level, 0, 3)});
+        command.setData(new byte[]{type, (byte) level});
         SpDataProcessor.getInstance().send(command);
     }
 
@@ -180,6 +197,17 @@ public class FitHomeViewModel extends AndroidViewModel {
         if (latestMainControl != null && latestMainControl.runMode() != 0) {
             writeManualMode(winter ? 2 : 1);
         }
+    }
+
+    public void restoreLegacyStartupState(int comfortTemp, int comfortHumidity, boolean winter) {
+        requestLegacyInitialStatus();
+        boolean systemOn = (boolean) MySpUtil.getParam(getApplication(), MySpUtil.CLOSE_STATUS, true);
+        MqttUploadManager.getInstance().getmHxTopic().setSystemSwitch((byte) (systemOn ? 1 : 0));
+        if (!systemOn) {
+            return;
+        }
+        MySpUtil.setParam(getApplication(), MySpUtil.RUN_Mode_STATUS, 0);
+        writeAutoSceneTarget(comfortTemp, comfortHumidity, winter);
     }
 
     public void readMainControlStatus() {
@@ -398,8 +426,16 @@ public class FitHomeViewModel extends AndroidViewModel {
         }
         legacyInitialStatusRequested = true;
         try {
+            ControlCommand lowPowerCommand = new ControlCommand(FunctionObject.SET_LOW_POWER);
+            lowPowerCommand.setData(new byte[]{0x00});
+            HyApplication.setIsReboot(false);
+            SpDataProcessor.getInstance().send(lowPowerCommand);
+            SpDataProcessor.getInstance().send(new EnvironmentCommand(FunctionObject.GET_ENVIRONMENT_STATUS));
+            SpDataProcessor.getInstance().send(new FanCommand(FunctionObject.GET_FAN_STATUS));
+            SpDataProcessor.getInstance().send(new ControlCommand(FunctionObject.GET_CONTROL_STATUS));
             SpDataProcessor.getInstance().send(new CustomCommand(FunctionObject.GET_CUSTOM_DATA));
             SpDataProcessor.getInstance().send(new DCFanCommand(FunctionObject.GET_DC_FAN_STATUS));
+            SpDataProcessor.getInstance().send(new MeterCommand(1));
         } catch (Exception e) {
             errorMessage.postValue(e.getMessage());
         }
