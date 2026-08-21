@@ -659,6 +659,8 @@ public class SpDataProcessor {
                     if (spCommand.priority < 5) {
                         // 高优先级指令（如恢复出厂、OTA）通常需要更多处理时间
                         SystemClock.sleep(120);
+                    } else if (needsControlSettleDelay(spCommand)) {
+                        SystemClock.sleep(120);
                     } else {
                         // 普通指令间隔
                         SystemClock.sleep(50);
@@ -671,6 +673,18 @@ public class SpDataProcessor {
     }
 
     // 修改 send 方法为入队操作
+    private boolean needsControlSettleDelay(SpCommand spCommand) {
+        if (spCommand == null) {
+            return false;
+        }
+        if (spCommand.getTermType() == FunctionObject.MAIN_CONTROL_BOARD
+                && spCommand.getFunctionId() == FunctionObject.SET_CONTROL_MODE) {
+            return true;
+        }
+        return spCommand.getTermType() == FunctionObject.FAN
+                && spCommand.getFunctionId() == FunctionObject.SET_SPEED;
+    }
+
     public void send(SpCommand spCommand) {
         if (spCommand == null) {
 //            Log.i("info", "Null command, skip enqueue");
@@ -678,6 +692,7 @@ public class SpDataProcessor {
         }
 //        Log.d("QueueTest", "入队: " + spCommand.priority);
         try {
+            spCommand.markEnqueued();
             commandQueue.put(spCommand);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

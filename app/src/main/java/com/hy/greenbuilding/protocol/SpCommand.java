@@ -9,6 +9,8 @@ import java.io.IOException;
 
 public class SpCommand implements Comparable<SpCommand>{
     protected int priority = 10;
+    private long enqueueSequence = Long.MAX_VALUE;
+    private static long globalEnqueueSequence = 0;
 
     protected static final byte[] HEADER = {(byte)0xAA, (byte) 0x55};//协议帧头
     protected static final byte[] TAIL = {0x6B, (byte) 0xBB};
@@ -34,7 +36,17 @@ public class SpCommand implements Comparable<SpCommand>{
     @Override
     public int compareTo(SpCommand other) {
         // 数字越小，优先级越高（排在队列最前面）
-        return Integer.compare(this.priority, other.priority);
+        int priorityCompare = Integer.compare(this.priority, other.priority);
+        if (priorityCompare != 0) {
+            return priorityCompare;
+        }
+        return Long.compare(this.enqueueSequence, other.enqueueSequence);
+    }
+
+    public void markEnqueued() {
+        synchronized (SpCommand.class) {
+            enqueueSequence = ++globalEnqueueSequence;
+        }
     }
 
     public void setPriority(int priority) {
